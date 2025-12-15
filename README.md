@@ -2,6 +2,8 @@
 
 A minimal, stateless mail server health monitoring service using pure shell scripts with socat as the web server.
 
+🌐 **Live instance available at:** [mailcheck.aurio.no](https://mailcheck.aurio.no)
+
 ## Features
 
 - 📧 **MX Records Check** - Verifies mail server configuration
@@ -318,8 +320,12 @@ For public deployment, **MUST ADD**:
 - **HTTPS/TLS** termination
 - Monitoring and alerting for abuse
 
-**Note:** This server has NO built-in rate limiting or authentication. It is designed to run behind a reverse proxy that handles these security concerns.
-
 ## License
+
+BSD 2-Clause License
+
+Copyright (c) 2025, tevkar
+
+See [LICENSE](LICENSE) file for full details.
 
 MIT License - Feel free to modify and use as needed.
