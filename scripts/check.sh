@@ -184,14 +184,15 @@ fi
 
 START_PORTS=$(date +%s%3N)
 if [[ -n "$MX_HOST" && "$MX_HOST" != "none" ]]; then
-    # Check SMTP ports
-    SMTP_25=$(timeout 5 bash -c "echo > /dev/tcp/$MX_HOST/25" 2>/dev/null && echo "open" || echo "closed")
-    SMTP_587=$(timeout 5 bash -c "echo > /dev/tcp/$MX_HOST/587" 2>/dev/null && echo "open" || echo "closed")
-    SMTP_465=$(timeout 5 bash -c "echo > /dev/tcp/$MX_HOST/465" 2>/dev/null && echo "open" || echo "closed")
+    # Check SMTP ports using nc (netcat) for more reliable port checking
+    # Use -4 to force IPv4 and avoid IPv6 timeout issues
+    SMTP_25=$(timeout 3 nc -4 -z -w2 "$MX_HOST" 25 2>/dev/null && echo "open" || echo "closed")
+    SMTP_587=$(timeout 3 nc -4 -z -w2 "$MX_HOST" 587 2>/dev/null && echo "open" || echo "closed")
+    SMTP_465=$(timeout 3 nc -4 -z -w2 "$MX_HOST" 465 2>/dev/null && echo "open" || echo "closed")
     
-    # Check IMAP/POP3 (use domain directly)
-    IMAP_993=$(timeout 5 bash -c "echo > /dev/tcp/$DOMAIN/993" 2>/dev/null && echo "open" || echo "closed")
-    POP3_995=$(timeout 5 bash -c "echo > /dev/tcp/$DOMAIN/995" 2>/dev/null && echo "open" || echo "closed")
+    # Check IMAP/POP3 on the mail server hostname (same as MX)
+    IMAP_993=$(timeout 3 nc -4 -z -w2 "$MX_HOST" 993 2>/dev/null && echo "open" || echo "closed")
+    POP3_995=$(timeout 3 nc -4 -z -w2 "$MX_HOST" 995 2>/dev/null && echo "open" || echo "closed")
 else
     SMTP_25="n/a"
     SMTP_587="n/a"

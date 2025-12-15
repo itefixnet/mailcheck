@@ -7,7 +7,8 @@ RUN apk add --no-cache \
     curl \
     openssl \
     bind-tools \
-    ca-certificates
+    ca-certificates \
+    netcat-openbsd
 
 # Create application directory
 WORKDIR /app
