@@ -301,15 +301,15 @@ TIME_SSL=$(($(date +%s%3N) - START_SSL))
 # === OPEN RELAY CHECK ===
 
 START_RELAY=$(date +%s%3N)
-RELAY_STATUS="unknown"
+RELAY_STATUS="n/a"
 RELAY_MESSAGE="not tested"
 
 if [[ -z "$MX_HOST" || "$MX_HOST" == "none" ]]; then
     RELAY_STATUS="n/a"
     RELAY_MESSAGE="no MX record found"
 elif [[ "$SMTP_25" != "open" ]]; then
-    RELAY_STATUS="warning"
-    RELAY_MESSAGE="port 25 not accessible (may be blocked)"
+    RELAY_STATUS="n/a"
+    RELAY_MESSAGE="port 25 not accessible"
 else
     # Test if server accepts relay from external address
     RELAY_TEST=$(timeout 10 bash -c "
