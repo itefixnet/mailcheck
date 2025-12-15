@@ -41,9 +41,17 @@ START_TOTAL=$(date +%s%3N)
 
 # === DNS CHECKS ===
 
+# Build DNS server arguments for dig
+DNS_ARGS=""
+if [[ -n "$DNS_SERVERS" ]]; then
+    # Use first DNS server from comma-separated list
+    FIRST_DNS=$(echo "$DNS_SERVERS" | cut -d',' -f1 | tr -d ' ')
+    DNS_ARGS="@$FIRST_DNS"
+fi
+
 # Check MX records
 START_MX=$(date +%s%3N)
-MX_RECORDS=$(timeout 5 dig +time=2 +tries=2 +short MX "$DOMAIN" 2>&1 | grep -E "^[0-9]+ " | sort)
+MX_RECORDS=$(timeout 5 dig $DNS_ARGS +time=2 +tries=2 +short MX "$DOMAIN" 2>&1 | grep -E "^[0-9]+ " | sort)
 TIME_MX=$(($(date +%s%3N) - START_MX))
 if [[ -z "$MX_RECORDS" ]]; then
     MX_RECORDS="none"
@@ -54,7 +62,7 @@ fi
 
 # Check SPF record
 START_SPF=$(date +%s%3N)
-SPF_RECORD=$(timeout 5 dig +time=2 +tries=2 +short TXT "$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=spf1" | head -1 | tr -d '"')
+SPF_RECORD=$(timeout 5 dig $DNS_ARGS +time=2 +tries=2 +short TXT "$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=spf1" | head -1 | tr -d '"')
 TIME_SPF=$(($(date +%s%3N) - START_SPF))
 if [[ -z "$SPF_RECORD" ]]; then
     SPF_RECORD="not found"
@@ -65,7 +73,7 @@ fi
 
 # Check DMARC record
 START_DMARC=$(date +%s%3N)
-DMARC_RECORD=$(timeout 5 dig +time=2 +tries=2 +short TXT "_dmarc.$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=DMARC1" | head -1 | tr -d '"')
+DMARC_RECORD=$(timeout 5 dig $DNS_ARGS +time=2 +tries=2 +short TXT "_dmarc.$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=DMARC1" | head -1 | tr -d '"')
 TIME_DMARC=$(($(date +%s%3N) - START_DMARC))
 if [[ -z "$DMARC_RECORD" ]]; then
     DMARC_RECORD="not found"
@@ -80,11 +88,15 @@ DKIM_RECORDS=()
 DKIM_SELECTORS_FOUND=()
 DKIM_STATUS="unknown"
 
-# Common DKIM selectors to try
-DKIM_SELECTORS=("default" "selector1" "selector2" "google" "k1" "dkim" "s1" "s2" "mail" "email")
+# Get DKIM selectors from environment or use defaults
+if [[ -n "$DKIM_SELECTORS" ]]; then
+    IFS=',' read -ra SELECTORS <<< "$DKIM_SELECTORS"
+else
+    SELECTORS=("default" "selector1" "selector2" "google" "k1" "dkim" "s1" "s2" "mail" "email")
+fi
 
-for selector in "${DKIM_SELECTORS[@]}"; do
-    DKIM_RESULT=$(timeout 3 dig +time=1 +tries=1 +short TXT "$selector._domainkey.$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=DKIM1" | head -1 | tr -d '"')
+for selector in "${SELECTORS[@]}"; do
+    DKIM_RESULT=$(timeout 3 dig $DNS_ARGS +time=1 +tries=1 +short TXT "$selector._domainkey.$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=DKIM1" | head -1 | tr -d '"')
     if [[ -n "$DKIM_RESULT" ]]; then
         DKIM_SELECTORS_FOUND+=("$selector")
         # Truncate long keys for display
@@ -110,7 +122,7 @@ MX_HOST=$(echo "$MX_RECORDS" | head -1 | awk '{print $NF}' | sed 's/\.$//')
 
 # Get MX server IP address
 if [[ -n "$MX_HOST" && "$MX_HOST" != "none" ]]; then
-    MX_IP=$(timeout 5 dig +time=2 +tries=2 +short A "$MX_HOST" 2>&1 | grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
+    MX_IP=$(timeout 5 dig $DNS_ARGS +time=2 +tries=2 +short A "$MX_HOST" 2>&1 | grep -E "^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$" | head -1)
 else
     MX_IP=""
 fi
@@ -142,7 +154,7 @@ if [[ -n "$MX_IP" ]]; then
         RBL_HOST="${rbl_entry%%:*}"
         RBL_NAME="${rbl_entry##*:}"
         
-        RBL_RESULT=$(timeout 3 dig +time=1 +tries=1 +short "$REVERSED_IP.$RBL_HOST" 2>/dev/null | head -1)
+        RBL_RESULT=$(timeout 3 dig $DNS_ARGS +time=1 +tries=1 +short "$REVERSED_IP.$RBL_HOST" 2>/dev/null | head -1)
         
         # Valid blacklist response is 127.0.0.x (not NXDOMAIN or other IPs)
         if [[ -n "$RBL_RESULT" ]] && echo "$RBL_RESULT" | grep -qE "^127\.0\.0\.[0-9]+$"; then

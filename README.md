@@ -6,13 +6,13 @@ A minimal, stateless mail server health monitoring service using pure shell scri
 
 - 📧 **MX Records Check** - Verifies mail server configuration
 - 🔒 **SSL/TLS Certificate Monitoring** - Checks SMTP certificate validity and expiration
-- 🌐 **DNS Records** - Validates SPF and DMARC records
+- 🌐 **DNS Records** - Validates SPF, DMARC, and DKIM records
 - 🔌 **Port Connectivity** - Tests SMTP (25, 587, 465), IMAP (993), POP3 (995)
 - 🚫 **RBL Blacklist Checks** - Tests against major spam blacklists (Spamhaus, SpamCop, etc.)
 - 🔓 **Open Relay Detection** - Security check for misconfigured mail servers
-- 📊 **Simple HTTP Interface** - Clean POST-based API
-- ⚡ **Concurrent Checks** - Lock-file based parallel processing
+- 📊 **Simple HTTP Interface** - Clean POST-based API with configuration panel
 - ⏱️ **Performance Metrics** - Response time tracking for all checks
+- 🔧 **Highly Configurable** - Frontend panel + environment variables for DKIM selectors, RBL servers, DNS servers
 - 🐳 **Fully Dockerized** - Pure shell, no Python/Node.js required
 - 🪶 **Lightweight** - Alpine-based, <50MB image
 
@@ -30,7 +30,12 @@ git clone <your-repo>
 cd mailcheck
 ```
 
-2. Build and run with Docker:
+2. Build and run:
+```bash
+./init.sh
+```
+
+Or manually with Docker:
 ```bash
 docker build -t mailcheck:latest .
 docker run -d \
@@ -43,7 +48,7 @@ docker run -d \
   mailcheck:latest
 ```
 
-4. Access the web interface:
+3. Access the web interface:
 ```
 http://localhost:8080
 ```
@@ -77,25 +82,41 @@ http://localhost:8080
 
 ## Configuration
 
-### Concurrent Checks
+### Frontend Configuration Panel
 
-By default, the system allows up to 10 concurrent checks. Configure via environment variable:
+The web interface includes an advanced configuration panel (⚙️ icon) where you can customize:
 
+- **DKIM Selectors** - Comma-separated list of selector names to check
+- **RBL Servers** - Blacklist servers in format `hostname:Name,hostname:Name`
+- **DNS Servers** - Comma-separated list of DNS resolver IPs
+
+These settings are applied per-check and don't require restarting the container.
+
+### Environment Variables (Default Values)
+
+You can also set defaults via environment variables:
+
+**DKIM Selectors:**
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -e MAX_PARALLEL_CHECKS=20 \
+  -e DKIM_SELECTORS="default,selector1,google,k1" \
   mailcheck:latest
 ```
 
-### RBL Servers
-
-Customize blacklist servers to check:
-
+**RBL Servers:**
 ```bash
 docker run -d \
   -p 8080:8080 \
   -e RBL_SERVERS="zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop" \
+  mailcheck:latest
+```
+
+**DNS Servers:**
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -e DNS_SERVERS="8.8.8.8,1.1.1.1" \
   mailcheck:latest
 ```
 
@@ -104,9 +125,13 @@ docker run -d \
 ### Check a Mail Server
 
 1. Visit http://localhost:8080
-2. Enter the mail server domain (e.g., `gmail.com` or `yourdomain.com`)
-3. Click "Check Server"
-4. View results:
+2. (Optional) Click **⚙️ Advanced Configuration** to customize:
+   - DKIM selectors to check
+   - RBL blacklist servers
+   - DNS resolvers to use
+3. Enter the mail server domain (e.g., `gmail.com` or `yourdomain.com`)
+4. Click "Check Server"
+5. View results:
    - MX records and IP address
    - SPF, DMARC, and DKIM records
    - Port connectivity (SMTP, IMAP, POP3)
@@ -204,7 +229,6 @@ Health check endpoint.
 - **Socat HTTP Server** - Lightweight TCP server with bash request handling
 - **Stateless** - No database, no persistent storage
 - **On-demand** - Checks run only when requested by users
-- **Concurrent** - Lock-file based parallel processing (default 10)
 - **Timeout-protected** - Individual timeouts for each check component
 
 Each check performs:
@@ -221,6 +245,8 @@ Each check performs:
 ```
 mailcheck/
 ├── Dockerfile              # Container definition (Alpine-based)
+├── init.sh                 # Build and start Docker container
+├── stop.sh                 # Stop and remove Docker container
 ├── scripts/
 │   ├── server.sh          # Socat-based HTTP server (pure bash)
 │   └── check.sh           # Mail server health check script
@@ -236,6 +262,11 @@ docker build -t mailcheck .
 ```
 
 ### Stopping the service
+```bash
+./stop.sh
+```
+
+Or manually:
 ```bash
 docker stop mailcheck
 docker rm mailcheck
@@ -281,9 +312,9 @@ curl http://localhost:8080/health
 ## Limitations
 
 - **Stateless** - No persistent monitoring or historical data
-- **No authentication** - Publicly accessible (use firewall/proxy for production)
-- **No rate limiting** - Consider adding nginx/Cloudflare in front for production
-- **DKIM selector detection** - Only tries common selectors (default, selector1, selector2, google, k1, dkim, s1, s2, mail, email)
+- **No authentication** - Publicly accessible (use reverse proxy for production)
+- **No rate limiting** - Must be implemented via reverse proxy (nginx, Cloudflare, etc.)
+- **DKIM selector detection** - Only tries configured selectors (customizable via DKIM_SELECTORS env var)
 - **Basic validation** - Domain format only, no advanced sanitization
 - **Port 25 often blocked** - Open relay test may fail on many networks
 - **RBL queries** - Dependent on external DNS services
@@ -293,19 +324,18 @@ curl http://localhost:8080/health
 
 This tool includes basic protections:
 - ✅ Domain format validation
-- ✅ Concurrent check limits (lock files)
 - ✅ Timeout protection per check component
 - ✅ Basic input sanitization
 
 For public deployment, **MUST ADD**:
-- Rate limiting (nginx, Cloudflare, fail2ban)
-- CAPTCHA or proof-of-work
-- Authentication/API keys
-- DDoS protection
-- Input sanitization for special characters
+- **Reverse proxy** (nginx, Cloudflare) with rate limiting
+- **CAPTCHA** or proof-of-work
+- **Authentication/API keys**
+- **DDoS protection** at network level
+- **HTTPS/TLS** termination
 - Monitoring and alerting for abuse
 
-**Note:** This is designed for personal/internal use. The socat server has no built-in rate limiting or request filtering.
+**Note:** This server has NO built-in rate limiting or authentication. It is designed to run behind a reverse proxy that handles these security concerns.
 
 ## License
 

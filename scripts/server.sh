@@ -54,8 +54,23 @@ handle_request() {
         /check)
             # Handle mail server check
             if [ "$METHOD" = "POST" ]; then
-                # Extract domain from POST data (expecting: domain=example.com)
-                DOMAIN=$(echo "$POST_DATA" | grep -oP '(?<=domain=)[^&]+' | sed 's/%2E/./g' | sed 's/+/ /g')
+                # URL decode helper function
+                urldecode() {
+                    echo "$1" | sed 's/%2E/./g; s/%2C/,/g; s/%3A/:/g; s/+/ /g; s/%20/ /g'
+                }
+                
+                # Extract parameters from POST data
+                DOMAIN=$(echo "$POST_DATA" | grep -oP '(?<=domain=)[^&]+' | head -1)
+                DOMAIN=$(urldecode "$DOMAIN")
+                
+                DKIM_SEL=$(echo "$POST_DATA" | grep -oP '(?<=dkim_selectors=)[^&]+' | head -1)
+                DKIM_SEL=$(urldecode "$DKIM_SEL")
+                
+                RBL_SRV=$(echo "$POST_DATA" | grep -oP '(?<=rbl_servers=)[^&]+' | head -1)
+                RBL_SRV=$(urldecode "$RBL_SRV")
+                
+                DNS_SRV=$(echo "$POST_DATA" | grep -oP '(?<=dns_servers=)[^&]+' | head -1)
+                DNS_SRV=$(urldecode "$DNS_SRV")
                 
                 if [ -z "$DOMAIN" ]; then
                     echo -ne "HTTP/1.1 400 Bad Request\r\n"
@@ -64,8 +79,14 @@ handle_request() {
                     echo -ne "\r\n"
                     echo '{"error":"Domain is required"}'
                 else
-                    # Run check script
-                    RESULT=$(v_v_domain="$DOMAIN" "$SCRIPTS_DIR/check.sh" 2>&1)
+                    # Build environment for check script
+                    CHECK_ENV="v_v_domain=$DOMAIN"
+                    [ -n "$DKIM_SEL" ] && CHECK_ENV="$CHECK_ENV DKIM_SELECTORS=$DKIM_SEL"
+                    [ -n "$RBL_SRV" ] && CHECK_ENV="$CHECK_ENV RBL_SERVERS=$RBL_SRV"
+                    [ -n "$DNS_SRV" ] && CHECK_ENV="$CHECK_ENV DNS_SERVERS=$DNS_SRV"
+                    
+                    # Run check script with environment variables
+                    RESULT=$(env $CHECK_ENV "$SCRIPTS_DIR/check.sh" 2>&1)
                     RESULT_SIZE=${#RESULT}
                     
                     echo -ne "HTTP/1.1 200 OK\r\n"
