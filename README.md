@@ -239,6 +239,9 @@ mailcheck/
 docker build -t mailcheck:latest .
 ```
 
+### Running rootless
+The container runs as a non-root user (UID 1000) for improved security. This is configured automatically in the Dockerfile.
+
 ### Stopping the service
 ```bash
 ./stop.sh
@@ -310,17 +313,20 @@ curl http://localhost:8080/health
 ## Security Considerations
 
 This tool includes basic protections:
-- ✅ Domain format validation
+- ✅ Domain format validation and strict sanitization
 - ✅ Timeout protection per check component
-- ✅ Basic input sanitization
+- ✅ Input sanitization to prevent command injection
+- ✅ Runs as non-root user (UID 1000) in container
 
 For public deployment, **MUST ADD**:
-- **Reverse proxy** (nginx, Cloudflare) with rate limiting
+- **Reverse proxy** (Apache, nginx, Cloudflare) with rate limiting
 - **CAPTCHA** or proof-of-work
 - **Authentication/API keys**
 - **DDoS protection** at network level
 - **HTTPS/TLS** termination
 - Monitoring and alerting for abuse
+
+**Note:** The live instance at [mailcheck.aurio.no](https://mailcheck.aurio.no) runs behind Apache reverse proxy with rate limiting.
 
 ## License
 

@@ -20,6 +20,14 @@ COPY frontend/ /app/frontend/
 # Make scripts executable
 RUN chmod +x /app/scripts/*.sh
 
+# Create non-root user
+RUN addgroup -g 1000 mailcheck && \
+    adduser -D -u 1000 -G mailcheck mailcheck && \
+    chown -R mailcheck:mailcheck /app
+
+# Switch to non-root user
+USER mailcheck
+
 # Expose port
 EXPOSE 8080
 
