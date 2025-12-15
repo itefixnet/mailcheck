@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  mailcheck:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      # Configure your SMTP settings for sending alerts
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      # Maximum number of parallel health checks
+      - MAX_PARALLEL_CHECKS=${MAX_PARALLEL_CHECKS:-50}
+      # Optional: Test email credentials for send/receive tests
+      - TEST_EMAIL=${TEST_EMAIL:-}
+      - TEST_EMAIL_PASSWORD=${TEST_EMAIL_PASSWORD:-}
+    restart: unless-stopped
