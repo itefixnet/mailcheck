@@ -4,6 +4,8 @@ A minimal, stateless mail server health monitoring service using pure shell scri
 
 🌐 **Live instance available at:** [mailcheck.aurio.no](https://mailcheck.aurio.no)
 
+![MailCheck Screenshot](mailcheck.png)
+
 ## Features
 
 - 📧 **MX Records Check** - Verifies mail server configuration
