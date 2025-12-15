@@ -83,33 +83,48 @@ http://localhost:8080
 
 ## Configuration
 
-All configuration is done through the **web interface** - no environment variables or container restarts needed!
+Configuration is done via **environment variables** at container startup:
 
-### Frontend Configuration Panel
+### Environment Variables
 
-Click **⚙️ Advanced Configuration** in the web interface to customize:
-
-- **DKIM Selectors** - Comma-separated list of selector names to check
+- **`DKIM_SELECTORS`** - Comma-separated list of DKIM selector names to check
   - Default: `default,selector1,selector2,google,k1,dkim,s1,s2,mail,email`
-- **RBL Servers** - Blacklist servers in format `hostname:Name,hostname:Name`
+  
+- **`RBL_SERVERS`** - Blacklist servers in format `hostname:Name,hostname:Name,...`
   - Default: `zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop,b.barracudacentral.org:Barracuda,cbl.abuseat.org:CBL,dnsbl-1.uceprotect.net:UCEPROTECT`
-- **DNS Servers** - Comma-separated list of DNS resolver IPs
+  
+- **`DNS_SERVERS`** - Comma-separated list of DNS resolver IPs
   - Default: `8.8.8.8,1.1.1.1`
 
-Configuration is applied per-check, allowing you to test different settings without restarting the container.
+**Example with custom configuration:**
+
+```bash
+docker run -d \
+  --name mailcheck \
+  -p 8080:8080 \
+  -e DKIM_SELECTORS="default,google,microsoft" \
+  -e RBL_SERVERS="zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop" \
+  -e DNS_SERVERS="1.1.1.1,8.8.8.8" \
+  mailcheck:latest
+```
+
+Or set them before running `./init.sh`:
+
+```bash
+export DKIM_SELECTORS="default,google"
+export RBL_SERVERS="zen.spamhaus.org:Spamhaus"
+export DNS_SERVERS="1.1.1.1"
+./init.sh
+```
 
 ## Usage
 
 ### Check a Mail Server
 
 1. Visit http://localhost:8080
-2. (Optional) Click **⚙️ Advanced Configuration** to customize:
-   - DKIM selectors to check
-   - RBL blacklist servers
-   - DNS resolvers to use
-3. Enter the mail server domain (e.g., `gmail.com` or `yourdomain.com`)
-4. Click "Check Server"
-5. View results:
+2. Enter the mail server domain (e.g., `gmail.com` or `yourdomain.com`)
+3. Click "Check Mail Server"
+4. View results:
    - MX records and IP address
    - SPF, DMARC, and DKIM records
    - Port connectivity (SMTP, IMAP, POP3)

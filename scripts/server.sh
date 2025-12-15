@@ -59,18 +59,9 @@ handle_request() {
                     echo "$1" | sed 's/%2E/./g; s/%2C/,/g; s/%3A/:/g; s/+/ /g; s/%20/ /g; s/%2F/\//g'
                 }
                 
-                # Extract parameters from POST data using sed (POSIX compatible)
+                # Extract domain parameter from POST data using sed (POSIX compatible)
                 DOMAIN=$(echo "$POST_DATA" | sed -n 's/.*domain=\([^&]*\).*/\1/p' | head -1)
                 DOMAIN=$(urldecode "$DOMAIN")
-                
-                DKIM_SEL=$(echo "$POST_DATA" | sed -n 's/.*dkim_selectors=\([^&]*\).*/\1/p' | head -1)
-                DKIM_SEL=$(urldecode "$DKIM_SEL")
-                
-                RBL_SRV=$(echo "$POST_DATA" | sed -n 's/.*rbl_servers=\([^&]*\).*/\1/p' | head -1)
-                RBL_SRV=$(urldecode "$RBL_SRV")
-                
-                DNS_SRV=$(echo "$POST_DATA" | sed -n 's/.*dns_servers=\([^&]*\).*/\1/p' | head -1)
-                DNS_SRV=$(urldecode "$DNS_SRV")
                 
                 if [ -z "$DOMAIN" ]; then
                     echo -ne "HTTP/1.1 400 Bad Request\r\n"
@@ -79,8 +70,8 @@ handle_request() {
                     echo -ne "\r\n"
                     echo '{"error":"Domain is required"}'
                 else
-                    # Run check script with properly quoted environment variables
-                    RESULT=$(v_v_domain="$DOMAIN" DKIM_SELECTORS="$DKIM_SEL" RBL_SERVERS="$RBL_SRV" DNS_SERVERS="$DNS_SRV" "$SCRIPTS_DIR/check.sh" 2>&1)
+                    # Run check script with environment variables (DKIM_SELECTORS, RBL_SERVERS, DNS_SERVERS from container env)
+                    RESULT=$(v_v_domain="$DOMAIN" "$SCRIPTS_DIR/check.sh" 2>&1)
                     RESULT_SIZE=${#RESULT}
                     
                     echo -ne "HTTP/1.1 200 OK\r\n"

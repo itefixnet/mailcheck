@@ -23,6 +23,9 @@ docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
   -p "$PORT:8080" \
+  -e DKIM_SELECTORS="${DKIM_SELECTORS:-default,selector1,selector2,google,k1,dkim,s1,s2,mail,email}" \
+  -e RBL_SERVERS="${RBL_SERVERS:-zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop,b.barracudacentral.org:Barracuda,cbl.abuseat.org:CBL,dnsbl-1.uceprotect.net:UCEPROTECT}" \
+  -e DNS_SERVERS="${DNS_SERVERS:-8.8.8.8,1.1.1.1}" \
   "$IMAGE_NAME"
 
 if [ $? -eq 0 ]; then

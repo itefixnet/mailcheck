@@ -203,50 +203,7 @@
             color: #666;
         }
         
-        .config-toggle {
-            display: inline-block;
-            margin-bottom: 20px;
-            color: #2196F3;
-            cursor: pointer;
-            font-size: 14px;
-            text-decoration: none;
-        }
-        
-        .config-toggle:hover {
-            text-decoration: underline;
-        }
-        
-        .config-panel {
-            display: none;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            border: 1px solid #dee2e6;
-        }
-        
-        .config-panel.show {
-            display: block;
-        }
-        
-        .config-panel h3 {
-            margin-bottom: 15px;
-            font-size: 18px;
-            color: #333;
-        }
-        
-        .config-panel textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 14px;
-            min-height: 80px;
-            resize: vertical;
-        }
-        
-        .config-panel .help-text {
+        .help-text {
             margin-top: 5px;
             font-size: 12px;
             color: #666;
@@ -316,30 +273,6 @@
         <h1>MailCheck</h1>
         <p class="subtitle">Instant mail server health check - DNS, ports, SSL, blacklist reputation, open relay test</p>
         
-        <a href="#" class="config-toggle" onclick="toggleConfig(event)">⚙️ Advanced Configuration</a>
-        
-        <div id="configPanel" class="config-panel">
-            <h3>Advanced Configuration</h3>
-            
-            <div class="form-group">
-                <label for="dkimSelectors">DKIM Selectors (comma-separated)</label>
-                <textarea id="dkimSelectors" placeholder="default,selector1,selector2,google,k1,dkim,s1,s2,mail,email">default,selector1,selector2,google,k1,dkim,s1,s2,mail,email</textarea>
-                <div class="help-text">Common DKIM selector names to check</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="rblServers">RBL Servers (format: hostname:Name, comma-separated)</label>
-                <textarea id="rblServers" placeholder="zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop">zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop,b.barracudacentral.org:Barracuda,cbl.abuseat.org:CBL,dnsbl-1.uceprotect.net:UCEPROTECT</textarea>
-                <div class="help-text">Blacklist servers to check against</div>
-            </div>
-            
-            <div class="form-group">
-                <label for="dnsServers">DNS Servers (comma-separated IPs)</label>
-                <textarea id="dnsServers" placeholder="8.8.8.8,1.1.1.1">8.8.8.8,1.1.1.1</textarea>
-                <div class="help-text">DNS resolvers to use for lookups</div>
-            </div>
-        </div>
-        
         <div class="form-group">
             <label for="domain">Mail Server Domain</label>
             <input type="text" id="domain" placeholder="example.com" autofocus>
@@ -353,17 +286,8 @@
     </div>
     
     <script>
-        function toggleConfig(e) {
-            e.preventDefault();
-            const panel = document.getElementById('configPanel');
-            panel.classList.toggle('show');
-        }
-        
         function checkDomain() {
             const domain = document.getElementById('domain').value.trim();
-            const dkimSelectors = document.getElementById('dkimSelectors').value.trim();
-            const rblServers = document.getElementById('rblServers').value.trim();
-            const dnsServers = document.getElementById('dnsServers').value.trim();
             const resultsDiv = document.getElementById('results');
             const messageDiv = document.getElementById('message');
             const btn = document.getElementById('checkBtn');
@@ -379,17 +303,8 @@
             messageDiv.style.display = 'none';
             btn.textContent = 'Checking...';
             
-            // Build request body with configuration
+            // Build request body with just domain
             let body = `domain=${encodeURIComponent(domain)}`;
-            if (dkimSelectors) {
-                body += `&dkim_selectors=${encodeURIComponent(dkimSelectors)}`;
-            }
-            if (rblServers) {
-                body += `&rbl_servers=${encodeURIComponent(rblServers)}`;
-            }
-            if (dnsServers) {
-                body += `&dns_servers=${encodeURIComponent(dnsServers)}`;
-            }
             
             // Make POST request to /check endpoint
             fetch('/check', {
