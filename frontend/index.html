@@ -237,50 +237,36 @@
             
             btn.disabled = true;
             btn.textContent = 'Connecting...';
-            resultsDiv.innerHTML = '<div class="loading">Initializing check...</div>';
+            resultsDiv.innerHTML = '<div class="loading">Checking mail server...</div>';
             resultsDiv.classList.add('show');
             messageDiv.style.display = 'none';
+            btn.textContent = 'Checking...';
             
-            // Close existing connection if any
-            if (ws) {
-                ws.close();
-            }
-            
-            // Create WebSocket connection
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-            
-            ws.onopen = () => {
-                btn.textContent = 'Checking...';
-                ws.send(JSON.stringify({ domain: domain }));
-            };
-            
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                
-                if (data.type === 'progress') {
-                    resultsDiv.innerHTML = `<div class="loading">${data.message}</div>`;
-                } else if (data.type === 'complete') {
-                    displayResults(data.data);
-                    ws.close();
-                } else if (data.error) {
+            // Make POST request to /check endpoint
+            fetch('/check', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `domain=${encodeURIComponent(domain)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
                     showMessage('Error: ' + data.error);
                     resultsDiv.classList.remove('show');
-                    ws.close();
+                } else {
+                    displayResults(data);
                 }
-            };
-            
-            ws.onerror = (error) => {
-                showMessage('Connection error');
+            })
+            .catch(error => {
+                showMessage('Request failed: ' + error.message);
                 resultsDiv.classList.remove('show');
+            })
+            .finally(() => {
                 btn.disabled = false;
                 btn.textContent = 'Check Mail Server';
-            };
-            
-            ws.onclose = () => {
-                btn.disabled = false;
-                btn.textContent = 'Check Mail Server';
-            };
+            });
         }
         
         function displayResults(data) {

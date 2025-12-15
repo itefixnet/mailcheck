@@ -1,39 +1,49 @@
 # MailCheck - Mail Server Health Monitoring
 
-A minimal, dockerized mail server health monitoring service built with shell2http and bash scripts.
+A minimal, stateless mail server health monitoring service using pure shell scripts with socat as the web server.
 
 ## Features
 
 - 📧 **MX Records Check** - Verifies mail server configuration
 - 🔒 **SSL/TLS Certificate Monitoring** - Checks SMTP certificate validity and expiration
-- 🌐 **DNS Records** - Validates SPF, DKIM, and DMARC records
+- 🌐 **DNS Records** - Validates SPF and DMARC records
 - 🔌 **Port Connectivity** - Tests SMTP (25, 587, 465), IMAP (993), POP3 (995)
-- 📊 **Simple Web Interface** - Easy monitoring dashboard
-- ⚡ **Parallel Worker Architecture** - Check up to 50 mail servers concurrently
-- 🔄 **No Cron Dependencies** - Pure shell2http event-driven
-- 📬 **Email Alerts** - Notifications when issues are detected
+- 🚫 **RBL Blacklist Checks** - Tests against major spam blacklists (Spamhaus, SpamCop, etc.)
+- 🔓 **Open Relay Detection** - Security check for misconfigured mail servers
+- 📊 **Simple HTTP Interface** - Clean POST-based API
+- ⚡ **Concurrent Checks** - Lock-file based parallel processing
+- ⏱️ **Performance Metrics** - Response time tracking for all checks
+- 🐳 **Fully Dockerized** - Pure shell, no Python/Node.js required
+- 🪶 **Lightweight** - Alpine-based, <50MB image
 
 ## Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- SMTP server for sending alert emails (optional but recommended)
+- Docker (Docker Compose optional)
 
 ### Setup
 
 1. Clone this repository:
 ```bash
 git clone <your-repo>
-cd monpleto
+cd mailcheck
 ```
 
-2. Build and run:
+2. Build and run with Docker:
 ```bash
-docker-compose up -d
+docker build -t mailcheck:latest .
+docker run -d \
+  --name mailcheck \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -e MAX_PARALLEL_CHECKS=10 \
+  --dns 8.8.8.8 \
+  --dns 1.1.1.1 \
+  mailcheck:latest
 ```
 
-3. Access the web interface:
+4. Access the web interface:
 ```
 http://localhost:8080
 ```
@@ -41,10 +51,10 @@ http://localhost:8080
 ## What It Checks
 
 ### DNS Records
-- **MX Records** - Mail server addresses
+- **MX Records** - Mail server addresses and IP resolution
 - **SPF Record** - Sender Policy Framework for anti-spoofing
 - **DMARC Record** - Domain-based Message Authentication
-- **DKIM Status** - DomainKeys Identified Mail (requires selector)
+- **DKIM Records** - Checks common selectors (default, selector1, selector2, google, k1, dkim, s1, s2, mail, email)
 
 ### Port Connectivity
 - **Port 25** - Standard SMTP
@@ -54,155 +64,168 @@ http://localhost:8080
 - **Port 995** - POP3 over SSL
 
 ### SSL/TLS Certificates
-- Certificate validity
+- Certificate validity (tries ports 587, 465, 25 with STARTTLS)
 - Expiration date and days remaining
-- Warnings at 30 days before expiry
+- Status: ok (>30 days), warning (<30 days), error (expired)
+
+### Security & Reputation
+- **RBL Blacklist Check** - Tests against Spamhaus, SpamCop, Barracuda, CBL, UCEPROTECT
+- **Open Relay Test** - Detects misconfigured mail servers that allow relaying
+
+### Performance
+- **Response Times** - Individual timing for each check component (DNS, ports, SSL, RBL, relay)
 
 ## Configuration
 
-### Parallel Workers
+### Concurrent Checks
 
-By default, the system can run up to 50 parallel mail server checks. Configure via environment variable:
+By default, the system allows up to 10 concurrent checks. Configure via environment variable:
 
-```yaml
-environment:
-  - MAX_PARALLEL_CHECKS=100  # Increase to 100 concurrent checks
-```
-
-### Email Alerts
-
-Configure SMTP settings for sending alerts:
-
-```yaml
-environment:
-  - SMTP_HOST=smtp.gmail.com
-  - SMTP_PORT=587
-```
-
-### Check Frequency
-
-Mail servers are checked every 5 minutes by default. Modify in `scripts/scheduler.sh`:
 ```bash
-sleep 300  # 300 seconds = 5 minutes
+docker run -d \
+  -p 8080:8080 \
+  -e MAX_PARALLEL_CHECKS=20 \
+  mailcheck:latest
+```
+
+### RBL Servers
+
+Customize blacklist servers to check:
+
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -e RBL_SERVERS="zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop" \
+  mailcheck:latest
 ```
 
 ## Usage
 
-### Register a Mail Server
+### Check a Mail Server
 
 1. Visit http://localhost:8080
-2. Enter your email address (for receiving alerts)
-3. Enter the mail server domain (e.g., `gmail.com` or `yourdomain.com`)
-4. Click "Start Monitoring"
-5. Save the token provided
-
-### Check Status
-
-1. Enter your token in the "Check Status" section
-2. Click "Check Status"
-3. View comprehensive health report including:
-   - DNS records status
-   - Port availability
-   - SSL certificate details
-   - Any detected issues
+2. Enter the mail server domain (e.g., `gmail.com` or `yourdomain.com`)
+3. Click "Check Server"
+4. View results:
+   - MX records and IP address
+   - SPF, DMARC, and DKIM records
+   - Port connectivity (SMTP, IMAP, POP3)
+   - SSL certificate validity and expiration
+   - RBL blacklist status
+   - Open relay security check
+   - Performance timing for each component
 
 ## API Endpoints
 
-### POST /api/register
-Register a new mail server monitor.
+### GET /
+Serves the web interface.
 
-**Parameters:**
-- `email` - Email address for alerts
-- `domain` - Mail server domain to monitor
+### POST /check
+Runs mail server health check.
+
+**Request:**
+```
+POST /check
+Content-Type: application/x-www-form-urlencoded
+
+domain=example.com
+```
 
 **Response:**
 ```json
 {
-  "token": "abc123...",
-  "message": "Successfully registered"
-}
-```
-
-### GET /api/status?token=TOKEN
-Get mail server health status.
-
-**Response:**
-```json
-[{
-  "email": "user@example.com",
   "domain": "example.com",
-  "status": "ok",
-  "last_check": "2025-12-15 12:34:56",
-  "mx_records": "10 mail.example.com.",
-  "spf_record": "v=spf1 include:_spf.example.com ~all",
-  "dmarc_record": "v=DMARC1; p=quarantine",
-  "smtp_port_25": "open",
-  "smtp_port_587": "open",
-  "smtp_port_465": "closed",
-  "imap_port_993": "open",
-  "pop3_port_995": "closed",
-  "smtp_ssl_valid": "valid",
-  "smtp_ssl_expiry": "Jan 1 00:00:00 2026 GMT",
-  "smtp_ssl_days_remaining": 382,
-  "last_error": "",
-  "error_count": 0
-}]
+    "status": "ok",
+    "checked_at": "2025-12-15 12:34:56",
+    "mx_records": "10 mail.example.com.",
+    "mx_status": "ok",
+    "mx_ip": "192.0.2.1",
+    "spf_record": "v=spf1 include:_spf.example.com ~all",
+    "spf_status": "ok",
+    "dmarc_record": "v=DMARC1; p=quarantine",
+    "dmarc_status": "ok",
+    "dkim_status": "ok",
+    "dkim_message": "found (default google)",
+    "dkim_records": [
+      "default: v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC...",
+      "google: v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA..."
+    ],
+    "rbl_status": "ok",
+    "rbl_message": "not listed on any blacklists",
+    "rbl_results": [
+      {"name": "Spamhaus", "status": "clean"},
+      {"name": "SpamCop", "status": "clean"}
+    ],
+    "smtp_port_25": "open",
+    "smtp_port_587": "open",
+    "smtp_port_465": "closed",
+    "imap_port_993": "open",
+    "pop3_port_995": "closed",
+    "smtp_ssl_valid": "valid",
+    "smtp_ssl_expiry": "Jan 1 00:00:00 2026 GMT",
+    "smtp_ssl_days_remaining": 382,
+    "smtp_ssl_status": "ok",
+    "open_relay_status": "ok",
+    "open_relay_message": "relay properly restricted",
+    "response_times": {
+      "dns_ms": 123,
+      "spf_ms": 45,
+      "dmarc_ms": 67,
+      "dkim_ms": 89,
+      "rbl_ms": 234,
+      "ports_ms": 345,
+      "ssl_ms": 456,
+      "relay_ms": 567,
+      "total_ms": 1926
+    }
+}
 ```
 
-### GET /api/worker
-Manually trigger health checks for all pending monitors.
+**Error Response:**
+```json
+{
+  "error": "Domain is required"
+}
+```
+
+### GET /health
+Health check endpoint.
 
 **Response:**
 ```json
 {
-  "status": "success",
-  "checked": 42,
-  "max_parallel": 50
+  "status": "ok"
 }
 ```
 
-### GET /api/stats
-Get system statistics.
+## Architecture
 
-**Response:**
-```json
-{
-  "total_monitors": 42,
-  "active_checks": 5,
-  "max_parallel": 50,
-  "last_worker_run": "[2025-12-15 12:34:56] Worker completed"
-}
-```
+- **Pure Shell** - No Python, Node.js, or other runtimes required
+- **Socat HTTP Server** - Lightweight TCP server with bash request handling
+- **Stateless** - No database, no persistent storage
+- **On-demand** - Checks run only when requested by users
+- **Concurrent** - Lock-file based parallel processing (default 10)
+- **Timeout-protected** - Individual timeouts for each check component
 
-## Monitoring Logic
-
-- Background scheduler triggers worker every 5 minutes
-- Worker spawns parallel check processes (configurable, default 50)
-- Each check performs:
-  1. DNS lookups (MX, SPF, DMARC)
-  2. Port connectivity tests
-  3. SSL certificate validation
-  4. Database update with results
-- Email alerts sent when status changes from OK to ERROR/WARNING
-- Checks only run if last check was >4 minutes ago (prevents overlaps)
+Each check performs:
+1. DNS lookups (MX, SPF, DMARC) with 5-second timeouts
+2. DKIM record detection (tries 10 common selectors)
+3. RBL blacklist queries against 5 major lists
+4. Port connectivity tests (SMTP 25/587/465, IMAP 993, POP3 995)
+5. SSL certificate validation with STARTTLS
+6. Open relay security test (port 25)
+7. Performance timing for all operations
 
 ## Project Structure
 
 ```
-monpleto/
-├── Dockerfile              # Container definition
-├── docker-compose.yml      # Docker Compose configuration
-├── init.sh                 # Container startup script
+mailcheck/
+├── Dockerfile              # Container definition (Alpine-based)
 ├── scripts/
-│   ├── init-db.sh         # Database initialization
-│   ├── register.sh        # Registration endpoint
-│   ├── status.sh          # Status endpoint
-│   ├── worker.sh          # Parallel mail health checker
-│   ├── scheduler.sh       # Background scheduler
-│   └── stats.sh           # Statistics endpoint
-├── frontend/
-│   └── index.html         # Web interface
-└── data/                  # SQLite database (created at runtime)
+│   ├── server.sh          # Socat-based HTTP server (pure bash)
+│   └── check.sh           # Mail server health check script
+└── frontend/
+    └── index.html         # Web interface
 ```
 
 ## Development
@@ -212,64 +235,77 @@ monpleto/
 docker build -t mailcheck .
 ```
 
-### Running without Docker Compose
+### Stopping the service
 ```bash
-docker run -p 8080:8080 -v $(pwd)/data:/app/data mailcheck
+docker stop mailcheck
+docker rm mailcheck
 ```
 
 ### Viewing logs
 ```bash
-docker-compose logs -f
+docker logs -f mailcheck
 ```
 
-### Accessing check logs
+### Testing the API
+Using curl:
 ```bash
-docker-compose exec mailcheck cat /app/data/mailcheck.log
+curl -X POST http://localhost:8080/check -d "domain=gmail.com"
 ```
 
-### Manually trigger checks
+### Health check
 ```bash
-curl http://localhost:8080/api/worker
-```
-
-### Check system stats
-```bash
-curl http://localhost:8080/api/stats
+curl http://localhost:8080/health
 ```
 
 ## Common Issues Detected
 
 ### DNS Issues
-- **No MX records** - Domain cannot receive email
-- **Missing SPF** - Emails may be marked as spam
-- **Missing DMARC** - No email authentication policy
+- **No MX records** - Domain cannot receive email (status: error)
+- **Missing SPF** - Emails may be marked as spam (status: warning)
+- **Missing DMARC** - No email authentication policy (status: warning)
+- **Missing DKIM** - Cannot verify email signatures (status: warning, checks common selectors)
+
+### Reputation Issues
+- **RBL listed** - Mail server on spam blacklist (status: error)
+- **Open relay detected** - Security vulnerability (status: error)
 
 ### Connectivity Issues
 - **All SMTP ports closed** - Mail server unreachable
-- **Port 587 closed** - Modern submission port unavailable
+- **Port 25 blocked** - Cannot test open relay
 
 ### Certificate Issues
-- **Certificate expiring soon** - 30-day warning
-- **Certificate expired** - Immediate alert
-- **Certificate unavailable** - STARTTLS failed
+- **Certificate expiring <30 days** - Warning status
+- **Certificate expired** - Error status
+- **Certificate unavailable** - STARTTLS failed (status: warning)
 
 ## Limitations
 
-- One monitor per email address (by design)
-- DKIM requires knowing the selector (not auto-detected)
-- Email alerts require working SMTP configuration
-- No authentication/authorization (suitable for internal use)
-- Basic SQL injection protection (use prepared statements in production)
+- **Stateless** - No persistent monitoring or historical data
+- **No authentication** - Publicly accessible (use firewall/proxy for production)
+- **No rate limiting** - Consider adding nginx/Cloudflare in front for production
+- **DKIM selector detection** - Only tries common selectors (default, selector1, selector2, google, k1, dkim, s1, s2, mail, email)
+- **Basic validation** - Domain format only, no advanced sanitization
+- **Port 25 often blocked** - Open relay test may fail on many networks
+- **RBL queries** - Dependent on external DNS services
+- **Blocking requests** - Each request blocks during check (30s max)
 
 ## Security Considerations
 
-This tool is designed for personal/internal use. For public deployment, add:
-- Email verification
-- Rate limiting
-- SQL injection protection (prepared statements)
-- CAPTCHA
-- Input sanitization
-- Authentication system
+This tool includes basic protections:
+- ✅ Domain format validation
+- ✅ Concurrent check limits (lock files)
+- ✅ Timeout protection per check component
+- ✅ Basic input sanitization
+
+For public deployment, **MUST ADD**:
+- Rate limiting (nginx, Cloudflare, fail2ban)
+- CAPTCHA or proof-of-work
+- Authentication/API keys
+- DDoS protection
+- Input sanitization for special characters
+- Monitoring and alerting for abuse
+
+**Note:** This is designed for personal/internal use. The socat server has no built-in rate limiting or request filtering.
 
 ## License
 

@@ -74,6 +74,35 @@ else
     DMARC_STATUS="ok"
 fi
 
+# Check DKIM records (try common selectors)
+START_DKIM=$(date +%s%3N)
+DKIM_RECORDS=()
+DKIM_SELECTORS_FOUND=()
+DKIM_STATUS="unknown"
+
+# Common DKIM selectors to try
+DKIM_SELECTORS=("default" "selector1" "selector2" "google" "k1" "dkim" "s1" "s2" "mail" "email")
+
+for selector in "${DKIM_SELECTORS[@]}"; do
+    DKIM_RESULT=$(timeout 3 dig +time=1 +tries=1 +short TXT "$selector._domainkey.$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=DKIM1" | head -1 | tr -d '"')
+    if [[ -n "$DKIM_RESULT" ]]; then
+        DKIM_SELECTORS_FOUND+=("$selector")
+        # Truncate long keys for display
+        DKIM_SHORT=$(echo "$DKIM_RESULT" | cut -c1-100)
+        DKIM_RECORDS+=("$selector: ${DKIM_SHORT}...")
+    fi
+done
+
+TIME_DKIM=$(($(date +%s%3N) - START_DKIM))
+
+if [[ ${#DKIM_SELECTORS_FOUND[@]} -gt 0 ]]; then
+    DKIM_STATUS="ok"
+    DKIM_MESSAGE="found (${DKIM_SELECTORS_FOUND[*]})"
+else
+    DKIM_STATUS="warning"
+    DKIM_MESSAGE="not found (tried common selectors)"
+fi
+
 # === REPUTATION / BLACKLIST CHECKS ===
 
 # Get first MX server for checks
@@ -291,7 +320,7 @@ TIME_TOTAL=$(($(date +%s%3N) - START_TOTAL))
 OVERALL_STATUS="ok"
 if [[ "$MX_STATUS" == "error" ]] || [[ "$SSL_STATUS" == "error" ]] || [[ "$RELAY_STATUS" == "error" ]] || [[ "$RBL_STATUS" == "error" ]]; then
     OVERALL_STATUS="error"
-elif [[ "$SPF_STATUS" == "warning" ]] || [[ "$DMARC_STATUS" == "warning" ]] || [[ "$SSL_STATUS" == "warning" ]] || [[ "$RBL_STATUS" == "warning" ]]; then
+elif [[ "$SPF_STATUS" == "warning" ]] || [[ "$DMARC_STATUS" == "warning" ]] || [[ "$DKIM_STATUS" == "warning" ]] || [[ "$SSL_STATUS" == "warning" ]] || [[ "$RBL_STATUS" == "warning" ]]; then
     OVERALL_STATUS="warning"
 fi
 
@@ -299,8 +328,18 @@ fi
 MX_RECORDS=$(echo "$MX_RECORDS" | tr '\n' ';' | sed 's/"/\\"/g')
 SPF_RECORD=$(echo "$SPF_RECORD" | sed 's/"/\\"/g')
 DMARC_RECORD=$(echo "$DMARC_RECORD" | sed 's/"/\\"/g')
+DKIM_MESSAGE=$(echo "$DKIM_MESSAGE" | sed 's/"/\\"/g')
 SSL_EXPIRY=$(echo "$SSL_EXPIRY" | sed 's/"/\\"/g')
 RBL_MESSAGE=$(echo "$RBL_MESSAGE" | sed 's/"/\\"/g')
+
+# Build DKIM results JSON array
+DKIM_RECORDS_JSON="["
+for i in "${!DKIM_RECORDS[@]}"; do
+    RECORD="${DKIM_RECORDS[$i]}"
+    [[ $i -gt 0 ]] && DKIM_RECORDS_JSON+=","
+    DKIM_RECORDS_JSON+="\"$(echo "$RECORD" | sed 's/"/\\"/g')\""
+done
+DKIM_RECORDS_JSON+="]"
 
 # Build RBL results JSON array
 RBL_RESULTS_JSON="["
@@ -325,6 +364,9 @@ printf '{
   "spf_status": "%s",
   "dmarc_record": "%s",
   "dmarc_status": "%s",
+  "dkim_status": "%s",
+  "dkim_message": "%s",
+  "dkim_records": %s,
   "rbl_status": "%s",
   "rbl_message": "%s",
   "rbl_results": %s,
@@ -343,10 +385,11 @@ printf '{
     "dns_ms": %s,
     "spf_ms": %s,
     "dmarc_ms": %s,
+    "dkim_ms": %s,
     "rbl_ms": %s,
     "ports_ms": %s,
     "ssl_ms": %s,
     "relay_ms": %s,
     "total_ms": %s
   }
-}' "$DOMAIN" "$OVERALL_STATUS" "$(date '+%Y-%m-%d %H:%M:%S')" "$MX_RECORDS" "$MX_STATUS" "$MX_IP" "$SPF_RECORD" "$SPF_STATUS" "$DMARC_RECORD" "$DMARC_STATUS" "$RBL_STATUS" "$RBL_MESSAGE" "$RBL_RESULTS_JSON" "$SMTP_25" "$SMTP_587" "$SMTP_465" "$IMAP_993" "$POP3_995" "$SSL_VALID" "$SSL_EXPIRY" "$SSL_DAYS" "$SSL_STATUS" "$RELAY_STATUS" "$RELAY_MESSAGE" "$TIME_MX" "$TIME_SPF" "$TIME_DMARC" "$TIME_RBL" "$TIME_PORTS" "$TIME_SSL" "$TIME_RELAY" "$TIME_TOTAL"
+}' "$DOMAIN" "$OVERALL_STATUS" "$(date '+%Y-%m-%d %H:%M:%S')" "$MX_RECORDS" "$MX_STATUS" "$MX_IP" "$SPF_RECORD" "$SPF_STATUS" "$DMARC_RECORD" "$DMARC_STATUS" "$DKIM_STATUS" "$DKIM_MESSAGE" "$DKIM_RECORDS_JSON" "$RBL_STATUS" "$RBL_MESSAGE" "$RBL_RESULTS_JSON" "$SMTP_25" "$SMTP_587" "$SMTP_465" "$IMAP_993" "$POP3_995" "$SSL_VALID" "$SSL_EXPIRY" "$SSL_DAYS" "$SSL_STATUS" "$RELAY_STATUS" "$RELAY_MESSAGE" "$TIME_MX" "$TIME_SPF" "$TIME_DMARC" "$TIME_DKIM" "$TIME_RBL" "$TIME_PORTS" "$TIME_SSL" "$TIME_RELAY" "$TIME_TOTAL"
