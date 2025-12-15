@@ -96,8 +96,10 @@ else
 fi
 
 for selector in "${SELECTORS[@]}"; do
-    DKIM_RESULT=$(timeout 3 dig $DNS_ARGS +time=1 +tries=1 +short TXT "$selector._domainkey.$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | grep -i "v=DKIM1" | head -1 | tr -d '"')
-    if [[ -n "$DKIM_RESULT" ]]; then
+    # Get DKIM record - may be split across multiple quoted strings
+    DKIM_RESULT=$(timeout 3 dig $DNS_ARGS +time=1 +tries=1 +short TXT "$selector._domainkey.$DOMAIN" 2>&1 | grep -v "^;;" | grep -v "error" | grep -v "timed out" | tr -d '\n' | tr -d '"')
+    # Check if it contains v=DKIM1
+    if [[ -n "$DKIM_RESULT" ]] && echo "$DKIM_RESULT" | grep -qi "v=DKIM1"; then
         DKIM_SELECTORS_FOUND+=("$selector")
         # Truncate long keys for display
         DKIM_SHORT=$(echo "$DKIM_RESULT" | cut -c1-100)
