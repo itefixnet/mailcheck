@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MailCheck - Mail Server Health Monitoring</title>
+    <title>MailCheck - Mail Server Health Check</title>
     <style>
         * {
             margin: 0;
@@ -50,10 +50,10 @@
         
         input {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 16px;
         }
         
         input:focus {
@@ -63,7 +63,7 @@
         
         button {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             background: #2196F3;
             color: white;
             border: none;
@@ -89,43 +89,18 @@
             display: none;
         }
         
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
         .message.error {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
         
-        .token-display {
-            background: #f8f9fa;
-            padding: 10px;
-            border-radius: 4px;
-            margin-top: 10px;
-            word-break: break-all;
-            font-family: monospace;
-            font-size: 14px;
-        }
-        
-        .status-section {
-            margin-top: 40px;
-            padding-top: 30px;
-            border-top: 2px solid #eee;
-        }
-        
-        .status-display {
-            margin-top: 15px;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 4px;
+        .results {
+            margin-top: 30px;
             display: none;
         }
         
-        .status-display.show {
+        .results.show {
             display: block;
         }
         
@@ -171,11 +146,10 @@
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
-            margin-top: 20px;
         }
         
         .status-card {
-            background: white;
+            background: #f8f9fa;
             padding: 15px;
             border-radius: 6px;
             border: 1px solid #dee2e6;
@@ -222,206 +196,248 @@
             color: #666;
             margin-top: 5px;
         }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>MailCheck</h1>
-        <p class="subtitle">Monitor your mail server health - DNS, ports, SSL certificates</p>
-        
-        <div class="form-group">
-            <label for="email">Email Address</label>
-            <input type="email" id="email" placeholder="your@email.com" required>
-            <div class="help-text">Where to send alerts</div>
-        </div>
+        <p class="subtitle">Instant mail server health check - DNS, ports, SSL, blacklist reputation, open relay test</p>
         
         <div class="form-group">
             <label for="domain">Mail Server Domain</label>
-            <input type="text" id="domain" placeholder="example.com" required>
-            <div class="help-text">Your mail server domain (without @ or protocol)</div>
+            <input type="text" id="domain" placeholder="example.com" autofocus>
+            <div class="help-text">Enter your mail server domain (e.g., gmail.com, outlook.com, yourdomain.com)</div>
         </div>
         
-        <button id="registerBtn" onclick="register()">Start Monitoring</button>
+        <button id="checkBtn" onclick="checkDomain()">Check Mail Server</button>
         
         <div id="message" class="message"></div>
-        
-        <div class="status-section">
-            <h2>Check Status</h2>
-            <div class="form-group">
-                <label for="token">Your Token</label>
-                <input type="text" id="token" placeholder="Enter your token">
-            </div>
-            <button onclick="checkStatus()">Check Status</button>
-            
-            <div id="statusDisplay" class="status-display"></div>
-        </div>
+        <div id="results" class="results"></div>
     </div>
     
     <script>
-        async function register() {
-            const email = document.getElementById('email').value;
-            const domain = document.getElementById('domain').value;
+        let ws = null;
+        
+        function checkDomain() {
+            const domain = document.getElementById('domain').value.trim();
+            const resultsDiv = document.getElementById('results');
             const messageDiv = document.getElementById('message');
-            const btn = document.getElementById('registerBtn');
+            const btn = document.getElementById('checkBtn');
             
-            if (!email || !domain) {
-                showMessage('Please fill in all fields', 'error');
+            if (!domain) {
+                showMessage('Please enter a domain');
                 return;
             }
             
             btn.disabled = true;
-            btn.textContent = 'Registering...';
+            btn.textContent = 'Connecting...';
+            resultsDiv.innerHTML = '<div class="loading">Initializing check...</div>';
+            resultsDiv.classList.add('show');
+            messageDiv.style.display = 'none';
             
-            try {
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `email=${encodeURIComponent(email)}&domain=${encodeURIComponent(domain)}`
-                });
+            // Close existing connection if any
+            if (ws) {
+                ws.close();
+            }
+            
+            // Create WebSocket connection
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+            
+            ws.onopen = () => {
+                btn.textContent = 'Checking...';
+                ws.send(JSON.stringify({ domain: domain }));
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
                 
-                const data = await response.json();
-                
-                if (data.token) {
-                    showMessage(
-                        data.message + '<div class="token-display">Your token: ' + data.token + '</div>' +
-                        '<p style="margin-top:10px">Save this token to check your mail server status.</p>',
-                        'success'
-                    );
-                    document.getElementById('token').value = data.token;
+                if (data.type === 'progress') {
+                    resultsDiv.innerHTML = `<div class="loading">${data.message}</div>`;
+                } else if (data.type === 'complete') {
+                    displayResults(data.data);
+                    ws.close();
                 } else if (data.error) {
-                    showMessage('Error: ' + data.error, 'error');
+                    showMessage('Error: ' + data.error);
+                    resultsDiv.classList.remove('show');
+                    ws.close();
                 }
-            } catch (error) {
-                showMessage('Failed to register: ' + error.message, 'error');
-            } finally {
+            };
+            
+            ws.onerror = (error) => {
+                showMessage('Connection error');
+                resultsDiv.classList.remove('show');
                 btn.disabled = false;
-                btn.textContent = 'Start Monitoring';
-            }
+                btn.textContent = 'Check Mail Server';
+            };
+            
+            ws.onclose = () => {
+                btn.disabled = false;
+                btn.textContent = 'Check Mail Server';
+            };
         }
         
-        async function checkStatus() {
-            const token = document.getElementById('token').value;
-            const statusDiv = document.getElementById('statusDisplay');
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            const statusClass = data.status || 'unknown';
             
-            if (!token) {
-                showMessage('Please enter your token', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/status?token=${encodeURIComponent(token)}`);
-                const data = await response.json();
-                
-                if (data.error) {
-                    showMessage('Error: ' + data.error, 'error');
-                    statusDiv.classList.remove('show');
-                } else if (Array.isArray(data) && data.length > 0) {
-                    const monitor = data[0];
-                    displayStatus(monitor);
-                }
-            } catch (error) {
-                showMessage('Failed to check status: ' + error.message, 'error');
-            }
-        }
-        
-        function displayStatus(monitor) {
-            const statusDiv = document.getElementById('statusDisplay');
-            const statusClass = monitor.status || 'unknown';
-            
-            statusDiv.innerHTML = `
+            resultsDiv.innerHTML = `
                 <div class="status-header">
                     <div>
-                        <h2>${monitor.domain}</h2>
-                        <small>Last check: ${monitor.last_check || 'Not yet checked'}</small>
+                        <h2>${data.domain}</h2>
+                        <small>Checked: ${data.checked_at}</small>
                     </div>
                     <span class="status-badge ${statusClass}">${statusClass}</span>
                 </div>
                 
-                ${monitor.last_error ? `
-                    <div style="background:#fff3cd; padding:10px; border-radius:4px; margin-bottom:20px; color:#856404;">
-                        <strong>Issues:</strong> ${monitor.last_error}
-                    </div>
-                ` : ''}
-                
                 <div class="status-grid">
                     <div class="status-card">
-                        <h3>DNS Records</h3>
+                        <h3>📧 DNS Records</h3>
                         <div class="status-item">
-                            <strong>MX Records:</strong><br>
-                            <small>${(monitor.mx_records || 'none').replace(/;/g, '<br>')}</small>
+                            <strong>MX Records:</strong>
+                            <span class="status-badge ${data.mx_status}">${data.mx_status}</span><br>
+                            <small style="word-break: break-all;">${(data.mx_records || 'none').replace(/;/g, '<br>')}</small>
+                        </div>
+                        ${data.mx_ip ? `
+                            <div class="status-item">
+                                <strong>MX IP:</strong> <small>${data.mx_ip}</small>
+                            </div>
+                        ` : ''}
+                        <div class="status-item">
+                            <strong>SPF:</strong>
+                            <span class="status-badge ${data.spf_status}">${data.spf_status}</span><br>
+                            <small style="word-break: break-all;">${data.spf_record || 'not found'}</small>
                         </div>
                         <div class="status-item">
-                            <strong>SPF:</strong><br>
-                            <small>${monitor.spf_record || 'not found'}</small>
-                        </div>
-                        <div class="status-item">
-                            <strong>DMARC:</strong><br>
-                            <small>${monitor.dmarc_record || 'not found'}</small>
+                            <strong>DMARC:</strong>
+                            <span class="status-badge ${data.dmarc_status}">${data.dmarc_status}</span><br>
+                            <small style="word-break: break-all;">${data.dmarc_record || 'not found'}</small>
                         </div>
                     </div>
                     
                     <div class="status-card">
-                        <h3>SMTP Ports</h3>
+                        <h3>🛡️ Reputation / Blacklist</h3>
+                        <div class="status-item">
+                            <strong>Status:</strong> 
+                            <span class="status-badge ${data.rbl_status}">${data.rbl_status}</span>
+                        </div>
+                        ${data.rbl_results && data.rbl_results.length > 0 ? `
+                            <div class="status-item">
+                                ${data.rbl_results.map(rbl => `
+                                    <small>
+                                        <strong>${rbl.name}:</strong> 
+                                        <span class="${rbl.status === 'listed' ? 'port-status closed' : 'port-status open'}">${rbl.status}</span>
+                                    </small><br>
+                                `).join('')}
+                            </div>
+                        ` : `
+                            <div class="status-item">
+                                <small style="word-break: break-word;">${data.rbl_message}</small>
+                            </div>
+                        `}
+                    </div>
+                    
+                    <div class="status-card">
+                        <h3>📮 SMTP Ports</h3>
                         <div class="status-item">
                             <strong>Port 25 (SMTP):</strong> 
-                            <span class="port-status ${monitor.smtp_port_25}">${monitor.smtp_port_25}</span>
+                            <span class="port-status ${data.smtp_port_25}">${data.smtp_port_25}</span>
                         </div>
                         <div class="status-item">
                             <strong>Port 587 (Submission):</strong> 
-                            <span class="port-status ${monitor.smtp_port_587}">${monitor.smtp_port_587}</span>
+                            <span class="port-status ${data.smtp_port_587}">${data.smtp_port_587}</span>
                         </div>
                         <div class="status-item">
                             <strong>Port 465 (SMTPS):</strong> 
-                            <span class="port-status ${monitor.smtp_port_465}">${monitor.smtp_port_465}</span>
+                            <span class="port-status ${data.smtp_port_465}">${data.smtp_port_465}</span>
                         </div>
                     </div>
                     
                     <div class="status-card">
-                        <h3>Mail Access Ports</h3>
+                        <h3>📬 Mail Access Ports</h3>
                         <div class="status-item">
                             <strong>Port 993 (IMAPS):</strong> 
-                            <span class="port-status ${monitor.imap_port_993}">${monitor.imap_port_993}</span>
+                            <span class="port-status ${data.imap_port_993}">${data.imap_port_993}</span>
                         </div>
                         <div class="status-item">
                             <strong>Port 995 (POP3S):</strong> 
-                            <span class="port-status ${monitor.pop3_port_995}">${monitor.pop3_port_995}</span>
+                            <span class="port-status ${data.pop3_port_995}">${data.pop3_port_995}</span>
                         </div>
                     </div>
                     
                     <div class="status-card">
-                        <h3>SSL/TLS Certificate</h3>
+                        <h3>🔒 SSL/TLS Certificate</h3>
                         <div class="status-item">
-                            <strong>Status:</strong> ${monitor.smtp_ssl_valid || 'unknown'}
+                            <strong>Status:</strong> 
+                            <span class="status-badge ${data.smtp_ssl_status}">${data.smtp_ssl_valid}</span>
                         </div>
-                        ${monitor.smtp_ssl_expiry ? `
+                        ${data.smtp_ssl_expiry !== 'n/a' ? `
                             <div class="status-item">
                                 <strong>Expires:</strong><br>
-                                <small>${monitor.smtp_ssl_expiry}</small>
+                                <small>${data.smtp_ssl_expiry}</small>
                             </div>
                             <div class="status-item">
-                                <strong>Days remaining:</strong> ${monitor.smtp_ssl_days_remaining}
+                                <strong>Days remaining:</strong> ${data.smtp_ssl_days_remaining}
                             </div>
                         ` : ''}
                     </div>
+                    
+                    <div class="status-card">
+                        <h3>🚫 Open Relay Check</h3>
+                        <div class="status-item">
+                            <strong>Status:</strong> 
+                            <span class="status-badge ${data.open_relay_status}">${data.open_relay_status}</span>
+                        </div>
+                        <div class="status-item">
+                            <small>${data.open_relay_message}</small>
+                        </div>
+                    </div>
+                    
+                    ${data.response_times ? `
+                    <div class="status-card">
+                        <h3>⏱️ Response Times</h3>
+                        <div class="status-item">
+                            <small>
+                                DNS: ${data.response_times.dns_ms}ms | 
+                                SPF: ${data.response_times.spf_ms}ms | 
+                                DMARC: ${data.response_times.dmarc_ms}ms | 
+                                RBL: ${data.response_times.rbl_ms}ms | 
+                                Ports: ${data.response_times.ports_ms}ms | 
+                                SSL: ${data.response_times.ssl_ms}ms | 
+                                Relay: ${data.response_times.relay_ms}ms | 
+                                <strong>Total: ${data.response_times.total_ms}ms</strong>
+                            </small>
+                        </div>
+                    </div>
+                    ` : ''}
                 </div>
             `;
-            statusDiv.classList.add('show');
+            resultsDiv.classList.add('show');
         }
         
-        function showMessage(text, type) {
+        function showMessage(text) {
             const messageDiv = document.getElementById('message');
-            messageDiv.innerHTML = text;
-            messageDiv.className = 'message ' + type;
+            messageDiv.textContent = text;
+            messageDiv.className = 'message error';
             messageDiv.style.display = 'block';
             
             setTimeout(() => {
-                if (type === 'error') {
-                    messageDiv.style.display = 'none';
-                }
+                messageDiv.style.display = 'none';
             }, 5000);
         }
+        
+        // Allow Enter key to submit
+        document.getElementById('domain').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkDomain();
+            }
+        });
     </script>
 </body>
 </html>

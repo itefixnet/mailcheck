@@ -12,7 +12,7 @@ services:
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
       - SMTP_PORT=${SMTP_PORT:-587}
       # Maximum number of parallel health checks
-      - MAX_PARALLEL_CHECKS=${MAX_PARALLEL_CHECKS:-50}
+      - MAX_PARALLEL_CHECKS=${MAX_PARALLEL_CHECKS:-10}
       # Optional: Test email credentials for send/receive tests
       - TEST_EMAIL=${TEST_EMAIL:-}
       - TEST_EMAIL_PASSWORD=${TEST_EMAIL_PASSWORD:-}
