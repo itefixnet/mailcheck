@@ -56,20 +56,20 @@ handle_request() {
             if [ "$METHOD" = "POST" ]; then
                 # URL decode helper function
                 urldecode() {
-                    echo "$1" | sed 's/%2E/./g; s/%2C/,/g; s/%3A/:/g; s/+/ /g; s/%20/ /g'
+                    echo "$1" | sed 's/%2E/./g; s/%2C/,/g; s/%3A/:/g; s/+/ /g; s/%20/ /g; s/%2F/\//g'
                 }
                 
-                # Extract parameters from POST data
-                DOMAIN=$(echo "$POST_DATA" | grep -oP '(?<=domain=)[^&]+' | head -1)
+                # Extract parameters from POST data using sed (POSIX compatible)
+                DOMAIN=$(echo "$POST_DATA" | sed -n 's/.*domain=\([^&]*\).*/\1/p' | head -1)
                 DOMAIN=$(urldecode "$DOMAIN")
                 
-                DKIM_SEL=$(echo "$POST_DATA" | grep -oP '(?<=dkim_selectors=)[^&]+' | head -1)
+                DKIM_SEL=$(echo "$POST_DATA" | sed -n 's/.*dkim_selectors=\([^&]*\).*/\1/p' | head -1)
                 DKIM_SEL=$(urldecode "$DKIM_SEL")
                 
-                RBL_SRV=$(echo "$POST_DATA" | grep -oP '(?<=rbl_servers=)[^&]+' | head -1)
+                RBL_SRV=$(echo "$POST_DATA" | sed -n 's/.*rbl_servers=\([^&]*\).*/\1/p' | head -1)
                 RBL_SRV=$(urldecode "$RBL_SRV")
                 
-                DNS_SRV=$(echo "$POST_DATA" | grep -oP '(?<=dns_servers=)[^&]+' | head -1)
+                DNS_SRV=$(echo "$POST_DATA" | sed -n 's/.*dns_servers=\([^&]*\).*/\1/p' | head -1)
                 DNS_SRV=$(urldecode "$DNS_SRV")
                 
                 if [ -z "$DOMAIN" ]; then
