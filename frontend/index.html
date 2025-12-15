@@ -402,6 +402,12 @@
                             <span class="status-badge ${data.dmarc_status}">${data.dmarc_status}</span><br>
                             <small style="word-break: break-all;">${data.dmarc_record || 'not found'}</small>
                         </div>
+                        <div class="status-item">
+                            <strong>DKIM:</strong>
+                            <span class="status-badge ${data.dkim_status}">${data.dkim_status}</span><br>
+                            <small style="word-break: break-all;">${data.dkim_message || 'not found'}</small>
+                            ${data.dkim_records && data.dkim_records.length > 0 ? `<br>${data.dkim_records.map(rec => `<small style="word-break: break-all;">${rec}</small>`).join('<br>')}` : ''}
+                        </div>
                     </div>
                     
                     <div class="status-card">
