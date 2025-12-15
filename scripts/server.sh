@@ -79,14 +79,8 @@ handle_request() {
                     echo -ne "\r\n"
                     echo '{"error":"Domain is required"}'
                 else
-                    # Build environment for check script
-                    CHECK_ENV="v_v_domain=$DOMAIN"
-                    [ -n "$DKIM_SEL" ] && CHECK_ENV="$CHECK_ENV DKIM_SELECTORS=$DKIM_SEL"
-                    [ -n "$RBL_SRV" ] && CHECK_ENV="$CHECK_ENV RBL_SERVERS=$RBL_SRV"
-                    [ -n "$DNS_SRV" ] && CHECK_ENV="$CHECK_ENV DNS_SERVERS=$DNS_SRV"
-                    
-                    # Run check script with environment variables
-                    RESULT=$(env $CHECK_ENV "$SCRIPTS_DIR/check.sh" 2>&1)
+                    # Run check script with properly quoted environment variables
+                    RESULT=$(v_v_domain="$DOMAIN" DKIM_SELECTORS="$DKIM_SEL" RBL_SERVERS="$RBL_SRV" DNS_SERVERS="$DNS_SRV" "$SCRIPTS_DIR/check.sh" 2>&1)
                     RESULT_SIZE=${#RESULT}
                     
                     echo -ne "HTTP/1.1 200 OK\r\n"

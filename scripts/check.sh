@@ -30,8 +30,11 @@ if [[ -z "$DOMAIN" ]]; then
     exit 1
 fi
 
-# Validate domain format
-if ! echo "$DOMAIN" | grep -qE '^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; then
+# Sanitize domain - remove any potentially dangerous characters
+DOMAIN=$(echo "$DOMAIN" | tr -cd 'a-zA-Z0-9.-')
+
+# Validate domain format (stricter: no leading/trailing dots or hyphens, no consecutive dots)
+if ! echo "$DOMAIN" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$'; then
     echo '{"error": "Invalid domain format (e.g., example.com)"}'
     exit 1
 fi
@@ -44,9 +47,14 @@ START_TOTAL=$(date +%s%3N)
 # Build DNS server arguments for dig
 DNS_ARGS=""
 if [[ -n "$DNS_SERVERS" ]]; then
+    # Sanitize: only allow digits, dots, commas for IPv4 addresses
+    DNS_SERVERS=$(echo "$DNS_SERVERS" | tr -cd '0-9.,')
     # Use first DNS server from comma-separated list
     FIRST_DNS=$(echo "$DNS_SERVERS" | cut -d',' -f1 | tr -d ' ')
-    DNS_ARGS="@$FIRST_DNS"
+    # Validate it looks like an IP
+    if echo "$FIRST_DNS" | grep -qE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'; then
+        DNS_ARGS="@$FIRST_DNS"
+    fi
 fi
 
 # Check MX records
@@ -90,6 +98,8 @@ DKIM_STATUS="unknown"
 
 # Get DKIM selectors from environment or use defaults
 if [[ -n "$DKIM_SELECTORS" ]]; then
+    # Sanitize: only allow alphanumeric, underscore, hyphen
+    DKIM_SELECTORS=$(echo "$DKIM_SELECTORS" | tr -cd 'a-zA-Z0-9,_-')
     IFS=',' read -ra SELECTORS <<< "$DKIM_SELECTORS"
 else
     SELECTORS=("default" "selector1" "selector2" "google" "k1" "dkim" "s1" "s2" "mail" "email")
@@ -141,6 +151,8 @@ if [[ -n "$MX_IP" ]]; then
     
     # Get RBL list from environment or use defaults
     if [[ -n "$RBL_SERVERS" ]]; then
+        # Sanitize: only allow domain characters, colons for labels, commas for separation
+        RBL_SERVERS=$(echo "$RBL_SERVERS" | tr -cd 'a-zA-Z0-9.,:_-')
         IFS=',' read -ra RBLS <<< "$RBL_SERVERS"
     else
         RBLS=(
