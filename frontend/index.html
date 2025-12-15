@@ -248,8 +248,60 @@
         
         .config-panel .help-text {
             margin-top: 5px;
-            font-size: 13px;
+            font-size: 12px;
             color: #666;
+        }
+        
+        .info-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            line-height: 16px;
+            text-align: center;
+            background: #2196F3;
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: help;
+            margin-left: 5px;
+            position: relative;
+        }
+        
+        .info-icon .tooltip {
+            visibility: hidden;
+            width: 280px;
+            background-color: #333;
+            color: #fff;
+            text-align: left;
+            border-radius: 6px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -140px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 13px;
+            font-weight: normal;
+            line-height: 1.4;
+        }
+        
+        .info-icon .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        
+        .info-icon:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
         }
         
         .help-text {
@@ -435,7 +487,8 @@
                     <div class="status-card">
                         <h3>📮 SMTP Ports</h3>
                         <div class="status-item">
-                            <strong>Port 25 (SMTP):</strong> 
+                            <strong>Port 25 (SMTP):</strong>
+                            <span class="info-icon">i<span class="tooltip">Port 25 may show as "closed" due to network-level blocking by ISPs/hosting providers to prevent spam. If your server can receive mail from other servers, port 25 is actually open - this is just a testing limitation.</span></span>
                             <span class="port-status ${data.smtp_port_25}">${data.smtp_port_25}</span>
                         </div>
                         <div class="status-item">
