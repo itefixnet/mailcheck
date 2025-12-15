@@ -57,16 +57,31 @@ if [[ -n "$DNS_SERVERS" ]]; then
     fi
 fi
 
-# Check MX records
+# Check MX records first - if none exist, domain is not configured for email
 START_MX=$(date +%s%3N)
 MX_RECORDS=$(timeout 5 dig $DNS_ARGS +time=2 +tries=2 +short MX "$DOMAIN" 2>&1 | grep -E "^[0-9]+ " | sort)
 TIME_MX=$(($(date +%s%3N) - START_MX))
-if [[ -z "$MX_RECORDS" ]]; then
-    MX_RECORDS="none"
-    MX_STATUS="error"
-else
-    MX_STATUS="ok"
+
+# Check if no MX records or null MX (0 .)
+if [[ -z "$MX_RECORDS" ]] || echo "$MX_RECORDS" | grep -qE "^0 \.$"; then
+    # No MX records or null MX = not a mail domain, return early
+    printf '{
+  "domain": "%s",
+  "status": "error",
+  "checked_at": "%s",
+  "error": "No MX records found - domain is not configured to receive email",
+  "mx_records": "none",
+  "mx_status": "error",
+  "response_times": {
+    "dns_ms": %d,
+    "total_ms": %d
+  }
+}' "$DOMAIN" "$(date '+%Y-%m-%d %H:%M:%S')" "$TIME_MX" "$TIME_MX"
+    exit 0
 fi
+
+MX_RECORDS_SORTED="$MX_RECORDS"
+MX_STATUS="ok"
 
 # Check SPF record
 START_SPF=$(date +%s%3N)
