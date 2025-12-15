@@ -289,7 +289,7 @@ curl http://localhost:8080/health
 
 ### Connectivity Issues
 - **All SMTP ports closed** - Mail server unreachable
-- **Port 25 blocked** - Cannot test open relay
+- **Port 25 shows closed but is actually open** - Many ISPs/hosting providers block outbound port 25 connections to prevent spam. This means the test cannot connect, but your mail server may still receive email from other servers. This is a **network limitation**, not a server issue.
 
 ### Certificate Issues
 - **Certificate expiring <30 days** - Warning status
@@ -301,9 +301,9 @@ curl http://localhost:8080/health
 - **Stateless** - No persistent monitoring or historical data
 - **No authentication** - Publicly accessible (use reverse proxy for production)
 - **No rate limiting** - Must be implemented via reverse proxy (nginx, Cloudflare, etc.)
-- **DKIM selector detection** - Only tries configured selectors (customizable via DKIM_SELECTORS env var)
+- **DKIM selector detection** - Only tries configured selectors (customizable via frontend config)
 - **Basic validation** - Domain format only, no advanced sanitization
-- **Port 25 often blocked** - Open relay test may fail on many networks
+- **Port 25 connectivity testing limited** - Many networks block outbound port 25 connections. If port 25 shows as "closed" but you know it's open, this is likely due to network-level blocking between the test server and your mail server. Real mail server-to-server communication will still work. Open relay tests may fail in this scenario.
 - **RBL queries** - Dependent on external DNS services
 - **Blocking requests** - Each request blocks during check (30s max)
 
