@@ -42,9 +42,6 @@ docker run -d \
   --name mailcheck \
   --restart unless-stopped \
   -p 8080:8080 \
-  -e MAX_PARALLEL_CHECKS=10 \
-  --dns 8.8.8.8 \
-  --dns 1.1.1.1 \
   mailcheck:latest
 ```
 
@@ -82,43 +79,20 @@ http://localhost:8080
 
 ## Configuration
 
+All configuration is done through the **web interface** - no environment variables or container restarts needed!
+
 ### Frontend Configuration Panel
 
-The web interface includes an advanced configuration panel (⚙️ icon) where you can customize:
+Click **⚙️ Advanced Configuration** in the web interface to customize:
 
 - **DKIM Selectors** - Comma-separated list of selector names to check
+  - Default: `default,selector1,selector2,google,k1,dkim,s1,s2,mail,email`
 - **RBL Servers** - Blacklist servers in format `hostname:Name,hostname:Name`
+  - Default: `zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop,b.barracudacentral.org:Barracuda,cbl.abuseat.org:CBL,dnsbl-1.uceprotect.net:UCEPROTECT`
 - **DNS Servers** - Comma-separated list of DNS resolver IPs
+  - Default: `8.8.8.8,1.1.1.1`
 
-These settings are applied per-check and don't require restarting the container.
-
-### Environment Variables (Default Values)
-
-You can also set defaults via environment variables:
-
-**DKIM Selectors:**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e DKIM_SELECTORS="default,selector1,google,k1" \
-  mailcheck:latest
-```
-
-**RBL Servers:**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e RBL_SERVERS="zen.spamhaus.org:Spamhaus,bl.spamcop.net:SpamCop" \
-  mailcheck:latest
-```
-
-**DNS Servers:**
-```bash
-docker run -d \
-  -p 8080:8080 \
-  -e DNS_SERVERS="8.8.8.8,1.1.1.1" \
-  mailcheck:latest
-```
+Configuration is applied per-check, allowing you to test different settings without restarting the container.
 
 ## Usage
 
@@ -258,7 +232,7 @@ mailcheck/
 
 ### Building locally
 ```bash
-docker build -t mailcheck .
+docker build -t mailcheck:latest .
 ```
 
 ### Stopping the service
@@ -278,9 +252,18 @@ docker logs -f mailcheck
 ```
 
 ### Testing the API
-Using curl:
+Using curl with default settings:
 ```bash
 curl -X POST http://localhost:8080/check -d "domain=gmail.com"
+```
+
+With custom configuration:
+```bash
+curl -X POST http://localhost:8080/check \
+  -d "domain=gmail.com" \
+  -d "dkim_selectors=default,google" \
+  -d "rbl_servers=zen.spamhaus.org:Spamhaus" \
+  -d "dns_servers=1.1.1.1"
 ```
 
 ### Health check
