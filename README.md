@@ -8,17 +8,17 @@ A minimal, stateless mail server health monitoring service using pure shell scri
 
 ## Features
 
-- 📧 **MX Records Check** - Verifies mail server configuration
-- 🔒 **SSL/TLS Certificate Monitoring** - Checks SMTP certificate validity and expiration
-- 🌐 **DNS Records** - Validates SPF, DMARC, and DKIM records
-- 🔌 **Port Connectivity** - Tests SMTP (25, 587, 465), IMAP (993), POP3 (995)
-- 🚫 **RBL Blacklist Checks** - Tests against major spam blacklists (Spamhaus, SpamCop, etc.)
-- 🔓 **Open Relay Detection** - Security check for misconfigured mail servers
-- 📊 **Simple HTTP Interface** - Clean POST-based API with configuration panel
-- ⏱️ **Performance Metrics** - Response time tracking for all checks
-- 🔧 **Highly Configurable** - Frontend panel + environment variables for DKIM selectors, RBL servers, DNS servers
-- 🐳 **Fully Dockerized** - Pure shell, no Python/Node.js required
-- 🪶 **Lightweight** - Alpine-based, <50MB image
+- **MX Records Check** - Verifies mail server configuration
+- **SSL/TLS Certificate Monitoring** - Checks SMTP certificate validity and expiration
+- **DNS Records** - Validates SPF, DMARC, and DKIM records
+- **Port Connectivity** - Tests SMTP (25, 587, 465), IMAP (993), POP3 (995)
+- **RBL Blacklist Checks** - Tests against major spam blacklists (Spamhaus, SpamCop, etc.)
+- **Open Relay Detection** - Security check for misconfigured mail servers
+- **Simple HTTP Interface** - Clean POST-based API with configuration panel
+- **Performance Metrics** - Response time tracking for all checks
+- **Highly Configurable** - Frontend panel + environment variables for DKIM selectors, RBL servers, DNS servers
+- **Fully Dockerized** - Pure shell, no Python/Node.js required
+- **Lightweight** - Alpine-based, <50MB image
 
 ## Quick Start
 
@@ -233,20 +233,6 @@ Each check performs:
 6. Open relay security test (port 25)
 7. Performance timing for all operations
 
-## Project Structure
-
-```
-mailcheck/
-├── Dockerfile              # Container definition (Alpine-based)
-├── init.sh                 # Build and start Docker container
-├── stop.sh                 # Stop and remove Docker container
-├── scripts/
-│   ├── server.sh          # Socat-based HTTP server (pure bash)
-│   └── check.sh           # Mail server health check script
-└── frontend/
-    └── index.html         # Web interface
-```
-
 ## Development
 
 ### Building locally
@@ -341,14 +327,10 @@ For public deployment, **MUST ADD**:
 - **HTTPS/TLS** termination
 - Monitoring and alerting for abuse
 
-**Note:** The live instance at [mailcheck.aurio.no](https://mailcheck.aurio.no) runs behind Apache reverse proxy with rate limiting.
-
 ## License
 
 BSD 2-Clause License
 
-Copyright (c) 2025, tevkar
+Copyright (c) 2025, itefixnet
 
 See [LICENSE](LICENSE) file for full details.
-
-MIT License - Feel free to modify and use as needed.
