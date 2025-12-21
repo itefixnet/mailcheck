@@ -2,8 +2,6 @@
 
 A minimal, stateless mail server health monitoring service using pure shell scripts with socat as the web server.
 
-🌐 **Live instance available at:** [mailcheck.aurio.no](https://mailcheck.aurio.no)
-
 ![MailCheck Screenshot](mailcheck.png)
 
 ## Features
